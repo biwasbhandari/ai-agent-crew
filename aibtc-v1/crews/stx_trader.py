@@ -7,6 +7,7 @@ from textwrap import dedent
 from utils.crews import AIBTC_Crew, display_token_usage
 from utils.scripts import get_timestamp
 
+
 class STXTraderCrew(AIBTC_Crew):
     def __init__(self):
         super().__init__("STX Trader")
@@ -14,39 +15,6 @@ class STXTraderCrew(AIBTC_Crew):
 
     def setup_agents(self, llm):
         # Market analyst prompt updated with the analysis factors
-        market_analyst = Agent(
-            role="STX Market Analyst",
-            goal=dedent(
-                """
-                Analyze STX market data and recommend a trading action based on the following metrics:
-
-                - Market Cap: The total market value of a cryptocurrency's circulating supply. It indicates the free-float capitalization in the stock market.
-                - Volume (24h): The amount of STX traded in the last 24 hours.
-                - Volume Change (24h Percentage): Indicator of liquidity.
-                - Volume/Market Cap (24h): Indicates liquidity. A higher ratio means the cryptocurrency is more liquid and easier to trade.
-                - Percentage Change (1h): The percentage change in STX price over the past hour.
-                - Percentage Change (24h): The percentage change in STX price over the past 24 hours.
-                - Percentage Change (7d): The percentage change in STX price over the past 7 days.
-                - Percentage Change (30d): The percentage change in STX price over the past 30 days.
-                - Market Cap Dominance: Indicates the relative size and influence of STX in the broader cryptocurrency market.
-                - Fully Diluted Market Cap: The total market capitalization if all STX tokens were issued.
-
-                Use this data to recommend a buy, sell, or hold action.
-                """
-            ),
-            tools=[
-                AgentTools.get_latest_price,  # Fetches the necessary market data
-            ],
-            backstory=dedent(
-                """
-                You are a seasoned cryptocurrency analyst specializing in Stacks (STX) tokens. Your expertise lies in interpreting short-term price movements and market trends to make informed trading recommendations.
-                """
-            ),
-            verbose=True,
-            llm=llm,
-        )
-        self.add_agent(market_analyst)
-
         balance_fetcher = Agent(
             role="STX Balance Fetcher",
             goal=dedent(
@@ -64,6 +32,42 @@ class STXTraderCrew(AIBTC_Crew):
             llm=llm,
         )
         self.add_agent(balance_fetcher)
+
+        result = AgentFunctions.get_latest_price()
+        print(result)
+        market_analyst = Agent(
+            role="STX Market Analyst",
+            goal=dedent(
+                f"""
+                Based on the current balance of the given user's address,
+                Analyze {result.get('name')}({result.get('symbol')}) current market data and recommend a trading action based on the following metrics:
+                - Current Stacks Prize= {result.get('stx_price')} usd Current prize of Stack coin\n
+                - Market Cap= {result.get('market_cap')} (The total market value of a cryptocurrency's circulating supply. It indicates the free-float capitalization in the stock market.)
+                - Volume (24h)= {result.get('volume_24h')} (The amount of STX traded in the last 24 hours.
+                - Volume Change (24h Percentage): Indicator of liquidity.)
+                - Volume/Market Cap (24h)= {result.get('volume_change_24h')} (Indicates liquidity. A higher ratio means the cryptocurrency is more liquid and easier to trade.)
+                - Percentage Change (1h)= {result.get('percent_change_1h')} (The percentage change in STX price over the past hour.)
+                - Percentage Change (24h)= {result.get('percent_change_24h')} (The percentage change in STX price over the past 24 hours.)
+                - Percentage Change (7d)= {result.get('percent_change_7d')} (The percentage change in STX price over the past 7 days.)
+                - Percentage Change (30d)= {result.get('percent_change_30d')} (The percentage change in STX price over the past 30 days.)
+                - Market Cap Dominance: {result.get('market_cap_dominance')} (Indicates the relative size and influence of STX in the broader cryptocurrency market.)
+                - Fully Diluted Market Cap:{result.get('fully_diluted_market_cap')} ( The total market capitalization if all STX tokens were issued.)
+
+                Use this data to recommend a buy, sell, or hold(no action) action.
+                """
+            ),
+            # tools= [
+            #     AgentTools.get_latest_price,  # Fetches the necessary market data
+            # ],
+            backstory=dedent(
+                """
+                You are a seasoned cryptocurrency analyst specializing in Stacks (STX) tokens. Your expertise lies in interpreting short-term price movements and market trends to make informed trading recommendations.
+                """
+            ),
+            verbose=True,
+            llm=llm,
+        )
+        self.add_agent(market_analyst)
 
     def setup_tasks(self, address):
         # Market analysis task
@@ -108,12 +112,15 @@ class STXTraderCrew(AIBTC_Crew):
     def get_all_tools(cls):
         return AgentTools.get_all_tools()
 
+
 def render_crew(self):
     st.subheader("STX Trader Crew")
-    st.markdown("This tool will analyze STX market conditions, execute trades, and fetch wallet balances.")
+    st.markdown(
+        "This tool will analyze STX market conditions, execute trades, and fetch wallet balances.")
 
     with st.form("stx_trader_form"):
-        address = st.text_input("STX Address", help="Enter the STX wallet address")
+        address = st.text_input(
+            "STX Address", help="Enter the STX wallet address")
         submitted = st.form_submit_button("Run Analysis")
 
     if submitted and address:
@@ -150,13 +157,15 @@ def render_crew(self):
             for task_result in result.raw:
                 # Display market recommendation
                 if "buy" in task_result["output"].lower() or "sell" in task_result["output"].lower() or "hold" in task_result["output"].lower():
-                    st.markdown(f"**Market Recommendation**: {task_result['output']}")
+                    st.markdown(
+                        f"**Market Recommendation**: {task_result['output']}")
 
                 # Display wallet balance
                 elif "stx_balance" in task_result["output"]:
                     st.subheader("STX Balance and Token Holdings")
                     balance_data = task_result['output']
-                    st.write(f"STX Balance: {balance_data['stx_balance']:.6f} STX")
+                    st.write(
+                        f"STX Balance: {balance_data['stx_balance']:.6f} STX")
 
                     # Display NFT holdings
                     if balance_data['nft_holdings']:
@@ -168,13 +177,14 @@ def render_crew(self):
                     if balance_data['fungible_tokens']:
                         st.subheader("Fungible Token Holdings")
                         for token, details in balance_data['fungible_tokens'].items():
-                            st.write(f"{token}: {int(details['balance']) / 1_000_000:.6f}")
+                            st.write(
+                                f"{token}: {int(details['balance']) / 1_000_000:.6f}")
 
             # Option to download the report
             timestamp = get_timestamp()
             st.download_button(
                 label="Download Analysis Report (Text)",
-                data=str(result.raw),  
+                data=str(result.raw),
                 file_name=f"{timestamp}_stx_trader_analysis.txt",
                 mime="text/plain",
             )
@@ -185,15 +195,10 @@ def render_crew(self):
     else:
         st.write("Enter STX Address, then click 'Run Analysis' to see results.")
 
+# helper function
 
-#########################
-# Agent Tools
-#########################
 
-class AgentTools:
-
-    @staticmethod
-    @tool("Get Latest Price")
+class AgentFunctions:
     def get_latest_price():
         """Fetch the latest STX token price from CoinMarketCap API."""
         try:
@@ -203,6 +208,7 @@ class AgentTools:
             }
             response = requests.request("GET", reqUrl, headers=headersList)
             stx_data = response.json()
+            print(stx_data, 'stx_data')
             return {
                 "name": stx_data["data"]["STX"]["name"],
                 "symbol": stx_data["data"]["STX"]["symbol"],
@@ -223,6 +229,13 @@ class AgentTools:
             st.error(f"Error fetching latest price: {str(e)}")
             return {}
 
+#########################
+# Agent Tools
+#########################
+
+
+class AgentTools:
+
     @staticmethod
     @tool("Get Address Balance Detailed")
     def get_address_balance_detailed(address: str):
@@ -238,12 +251,14 @@ class AgentTools:
                 fungible_holdings = balance_data.get("fungible_tokens", {})
 
                 return {
-                    "stx_balance": int(stx_balance) / 1_000_000,  # Convert to STX from microSTX
+                    # Convert to STX from microSTX
+                    "stx_balance": int(stx_balance) / 1_000_000,
                     "nft_holdings": nft_holdings,
                     "fungible_tokens": fungible_holdings
                 }
             else:
-                st.error(f"Error fetching balance: {response.status_code} {response.text}")
+                st.error(
+                    f"Error fetching balance: {response.status_code} {response.text}")
                 return {}
         except Exception as e:
             st.error(f"Error fetching balance: {str(e)}")
